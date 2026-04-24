@@ -20,7 +20,6 @@ class _VIPWorkstationState extends State<VIPWorkstation> {
   late final WebViewController controller;
   double mouseX = 300.0;
   double mouseY = 150.0;
-  bool showTools = false; // Menyembunyikan keyboard secara default
 
   @override
   void initState() {
@@ -30,7 +29,7 @@ class _VIPWorkstationState extends State<VIPWorkstation> {
       ..setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
       ..setNavigationDelegate(NavigationDelegate(
         onPageFinished: (String url) {
-          // KODE RAHASIA: Memaksa situs mengecil seperti layar PC 1440p
+          // Paksa layar jadi mode Desktop 1440p
           controller.runJavaScript("""
             var meta = document.querySelector('meta[name="viewport"]');
             if(meta) meta.remove();
@@ -45,10 +44,11 @@ class _VIPWorkstationState extends State<VIPWorkstation> {
   }
 
   void _sendClick() {
-    // KLIK KELAS BERAT: Tembus sistem Canvas FlutterFlow
+    // Sistem Klik Mouse Super Kuat
     controller.runJavaScript("""
       var el = document.elementFromPoint($mouseX, $mouseY);
       if(el) {
+        el.focus();
         var evDown = new PointerEvent('pointerdown', {bubbles: true, clientX: $mouseX, clientY: $mouseY});
         var evUp = new PointerEvent('pointerup', {bubbles: true, clientX: $mouseX, clientY: $mouseY});
         el.dispatchEvent(evDown);
@@ -61,71 +61,116 @@ class _VIPWorkstationState extends State<VIPWorkstation> {
   void _sendKey(String key) {
     controller.runJavaScript("window.dispatchEvent(new KeyboardEvent('keydown', {key: '$key', bubbles: true}));");
   }
+  
+  void _scroll(int amount) {
+    controller.runJavaScript("window.scrollBy(0, $amount);");
+  }
+
+  void _showTypingDialog() {
+    TextEditingController txtCtrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF1E1E1E),
+          title: const Text("Ketik Teks / Login", style: TextStyle(color: Colors.white, fontSize: 16)),
+          content: TextField(
+            controller: txtCtrl,
+            autofocus: true,
+            style: const TextStyle(color: Colors.white),
+            decoration: const InputDecoration(
+              hintText: "Masukkan teks di sini...",
+              hintStyle: TextStyle(color: Colors.grey),
+              enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.blue)),
+              focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.blue)),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context), 
+              child: const Text("Batal", style: TextStyle(color: Colors.grey))
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
+              onPressed: () {
+                String text = txtCtrl.text.replaceAll("'", "\\'");
+                // Tembak teks ke dalam situs
+                controller.runJavaScript("""
+                  var el = document.activeElement;
+                  if(el) {
+                    document.execCommand('insertText', false, '$text');
+                    el.dispatchEvent(new Event('input', { bubbles: true }));
+                    el.dispatchEvent(new Event('change', { bubbles: true }));
+                  }
+                """);
+                Navigator.pop(context);
+              },
+              child: const Text("Kirim Teks", style: TextStyle(color: Colors.white)),
+            )
+          ],
+        );
+      }
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      body: Stack(
+      resizeToAvoidBottomInset: false,
+      body: Column(
         children: [
-          // 1. WEBVIEW DENGAN PERISAI MUTLAK (100% Mustahil disentuh jari)
-          IgnorePointer(
-            ignoring: true,
-            child: WebViewWidget(controller: controller),
-          ),
-
-          // 2. KACA TRACKPAD (Jari cuma buat gerakin kursor panah)
-          Positioned.fill(
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onPanUpdate: (d) => setState(() {
-                mouseX = (mouseX + d.delta.dx * 1.5).clamp(0, MediaQuery.of(context).size.width);
-                mouseY = (mouseY + d.delta.dy * 1.5).clamp(0, MediaQuery.of(context).size.height);
-              }),
-              onTap: _sendClick,
-              child: Container(color: Colors.transparent),
-            ),
-          ),
-
-          // 3. KURSOR PANAH PUTIH
-          Positioned(
-            left: mouseX,
-            top: mouseY,
-            child: IgnorePointer(
-              child: Transform.rotate(
-                angle: -math.pi / 4.5,
-                child: const Icon(Icons.navigation, color: Colors.white, size: 20, shadows: [Shadow(color: Colors.black, blurRadius: 4)]),
-              ),
-            ),
-          ),
-
-          // 4. MENU VIP (Hanya muncul kalau tombol ditekan)
-          if (showTools)
-            Positioned(
-              bottom: 20, left: 20, right: 80,
-              child: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(12)),
-                child: Wrap(
-                  spacing: 8, runSpacing: 8,
-                  children: [
-                    _vipBtn("CTRL", "Control"), _vipBtn("ALT", "Alt"), _vipBtn("SHIFT", "Shift"),
-                    _vipBtn("BSPACE", "Backspace"), _vipBtn("DEL", "Delete"), _vipBtn("ENTER", "Enter"),
-                    _vipBtn("TAB", "Tab"), _vipBtn("ESC", "Escape"),
-                  ],
+          Expanded(
+            child: Stack(
+              children: [
+                // Lapisan 1: Web diblokir total dari jari
+                IgnorePointer(
+                  ignoring: true,
+                  child: WebViewWidget(controller: controller),
                 ),
-              ),
+                // Lapisan 2: Kaca Trackpad untuk Mouse
+                Positioned.fill(
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onPanUpdate: (d) => setState(() {
+                      mouseX = (mouseX + d.delta.dx * 1.5).clamp(0, MediaQuery.of(context).size.width);
+                      mouseY = (mouseY + d.delta.dy * 1.5).clamp(0, MediaQuery.of(context).size.height);
+                    }),
+                    onTap: _sendClick,
+                    child: Container(color: Colors.transparent),
+                  ),
+                ),
+                // Lapisan 3: Kursor Panah Putih
+                Positioned(
+                  left: mouseX,
+                  top: mouseY,
+                  child: IgnorePointer(
+                    child: Transform.rotate(
+                      angle: -math.pi / 4.5,
+                      child: const Icon(Icons.navigation, color: Colors.white, size: 20, shadows: [Shadow(color: Colors.black, blurRadius: 4)]),
+                    ),
+                  ),
+                ),
+              ],
             ),
-
-          // 5. TOMBOL ASSISTIVE TRANSPARAN (Di pojok kanan bawah)
-          Positioned(
-            bottom: 20, right: 20,
-            child: FloatingActionButton(
-              mini: true,
-              backgroundColor: Colors.white.withOpacity(0.3), // Transparan biar ga ganggu
-              elevation: 0,
-              child: Icon(showTools ? Icons.close : Icons.keyboard, color: Colors.black),
-              onPressed: () => setState(() => showTools = !showTools),
+          ),
+          // Barisan Tombol VIP Pro di Bawah
+          Container(
+            color: const Color(0xFF121212),
+            height: 45,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 5),
+              children: [
+                _actionBtn("⌨️ KETIK", _showTypingDialog, Colors.blue[700]!),
+                _actionBtn("↑ SCROLL", () => _scroll(-150), Colors.green[800]!),
+                _actionBtn("↓ SCROLL", () => _scroll(150), Colors.green[800]!),
+                const VerticalDivider(color: Colors.grey, width: 20, indent: 10, endIndent: 10),
+                _vipBtn("CTRL", "Control"), _vipBtn("ALT", "Alt"), _vipBtn("SHIFT", "Shift"),
+                _vipBtn("B-SPACE", "Backspace"), _vipBtn("DEL", "Delete"), _vipBtn("ENTER", "Enter"),
+                _vipBtn("TAB", "Tab"), _vipBtn("ESC", "Escape"), _vipBtn("SPACE", " "),
+                _vipBtn("←", "ArrowLeft"), _vipBtn("↑", "ArrowUp"), _vipBtn("↓", "ArrowDown"), _vipBtn("→", "ArrowRight"),
+              ],
             ),
           ),
         ],
@@ -133,11 +178,25 @@ class _VIPWorkstationState extends State<VIPWorkstation> {
     );
   }
 
+  Widget _actionBtn(String label, VoidCallback onTap, Color color) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+      child: ElevatedButton(
+        style: ElevatedButton.styleFrom(backgroundColor: color, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 10)),
+        onPressed: onTap,
+        child: Text(label, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+      ),
+    );
+  }
+
   Widget _vipBtn(String label, String key) {
-    return ElevatedButton(
-      style: ElevatedButton.styleFrom(backgroundColor: Colors.grey[800], minimumSize: const Size(50, 35)),
-      onPressed: () => _sendKey(key),
-      child: Text(label, style: const TextStyle(fontSize: 10, color: Colors.white)),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+      child: ElevatedButton(
+        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2C2C2C), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 10)),
+        onPressed: () => _sendKey(key),
+        child: Text(label, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+      ),
     );
   }
 }
